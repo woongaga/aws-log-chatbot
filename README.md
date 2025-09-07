@@ -6,7 +6,10 @@
 # 선행조건
 - AWS 콘솔 접속 후, Amazon Bedrock -> Configure and learn -> 모델 액세스 -> Claude 3.5 Sonnet을 액세스 요청해야합니다.(사용 리전 지정 - 본 프로젝트는 서울 기준)
 
-# 배포
+# 사용방법
+- 다운받은 후, terraform.tfvars.example파일을 자신에 맞게 수정 후, terraform.tfvars로 변경하세요.
+
+# 배포 및 삭제
 ```bash
 terraform init
 terraform fmt -recursive
@@ -14,7 +17,5 @@ terraform validate
 terraform plan
 terraform apply
 
-# 배포
-```bash
 terraform destroy
 
