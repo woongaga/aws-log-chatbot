@@ -1,0 +1,16 @@
+# ---- Region & Profile ----
+aws_region  = "ap-northeast-2"
+aws_profile = "default"
+
+# ---- S3 Buckets ----
+page_bucket = "your-page-bucket"
+log_bucket  = "your-log-bucket"
+play_bucket = "your-playbook-bucket"
+
+# ---- RDS ----
+db_username = "appuser"
+db_password = "your_password"
+db_name     = "appdb"
+
+# ---- Lambda / CORS ----
+allow_origin = "http://your-page-bucket.s3-website.ap-northeast-2.amazonaws.com"

@@ -1,0 +1,26 @@
+# ==== Terraform ====
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform.tfstate.lock.info
+
+# Lock 파일은 커밋 O (프로바이더 버전 고정)
+!.terraform.lock.hcl
+
+# ==== Secrets / 환경변수 ====
+terraform.tfvars
+*.auto.tfvars
+*.env
+
+# ==== Lambda build ====
+lambda/function.zip
+
+# ==== OS/IDE ====
+.DS_Store
+Thumbs.db
+.vscode/

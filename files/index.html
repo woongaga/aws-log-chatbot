@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI 로그 분석 데모 (ALB & VPC Flow)</title>
+  <style>
+    :root { --bg:#0b1020; --panel:#151a2c; --ink:#e9eefc; --muted:#9fb3ff; --accent:#5b8cff; --ring: rgba(91,140,255,.35); }
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Noto Sans,Apple SD Gothic Neo,"Malgun Gothic",sans-serif}
+    header{position:sticky;top:0;backdrop-filter:blur(8px);background:linear-gradient(180deg,rgba(11,16,32,.85),rgba(11,16,32,.55));border-bottom:1px solid #22263e;padding:14px 16px}
+    header h1{font-size:16px;margin:0}
+    .wrap{max-width:980px;margin:18px auto;padding:0 14px 120px}
+    .suggest{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 12px}
+    .suggest button{padding:8px 10px;border-radius:10px;border:1px solid #2a325a;background:#111737;color:var(--ink);cursor:pointer}
+    .chat{display:flex;flex-direction:column;gap:12px}
+    .msg{display:flex;gap:10px}
+    .bubble{padding:12px 14px;border-radius:14px;max-width:78%;white-space:pre-wrap;word-break:break-word;border:1px solid #242a46;background:#151a2c}
+    .msg.user{justify-content:flex-end}.msg.user .bubble{background:#1e2b58;border-color:#2b3a6e}
+    .msg.error .bubble{background:#2a0f14;border-color:#4a1c23;color:#ffd6d6}
+    .composer{position:fixed;left:0;right:0;bottom:0;background:linear-gradient(0deg,rgba(11,16,32,1) 70%,rgba(11,16,32,0));padding:16px 10px 18px}
+    .box{display:flex;gap:8px;max-width:980px;margin:0 auto;padding:10px;border-radius:16px;background:#151a2c;border:1px solid #242a46}
+    textarea{flex:1;resize:none;min-height:46px;max-height:200px;border:none;outline:none;background:transparent;color:var(--ink);font:inherit}
+    button.send{padding:10px 16px;border-radius:12px;border:1px solid #2a325a;background:linear-gradient(180deg,#1a2858,#17234c);color:var(--ink);cursor:pointer}
+    button.send:disabled{opacity:.6;cursor:not-allowed}
+    code.inline{background:#10183a;padding:2px 6px;border-radius:6px;border:1px solid #273054}
+  </style>
+  <!-- ① 테라폼이 생성/업로드할 config.js 를 먼저 로드 -->
+  <script src="config.js"></script>
+</head>
+<body>
+  <header><h1>AI 로그 분석 데모 <span style="opacity:.6">(ALB & VPC Flow)</span></h1></header>
+
+  <div class="wrap">
+    <div class="suggest" id="suggest">
+      <button>오늘 비정상 로그 있어?</button>
+      <button>오늘 5xx 급증 구간 알려줘</button>
+      <button>오늘 4xx 많은 경로 Top3</button>
+      <button>오늘 REJECT 상위 포트 Top5</button>
+      <button>오늘 포트 스캔 의심 있었나?</button>
+    </div>
+
+    <div id="chat" class="chat"></div>
+
+    <p style="opacity:.65;margin-top:8px">
+      운영자 외 사용을 금합니다.
+    </p>
+  </div>
+
+  <div class="composer">
+    <div class="box">
+      <textarea id="input" rows="1" placeholder="질문을 입력하세요. 예) 오늘 비정상 로그 있어?"></textarea>
+      <button id="send" class="send">보내기</button>
+    </div>
+  </div>
+
+<script>
+  // ② 하드코딩 제거: config.js 가 넣어둔 값을 사용
+  const API_URL = (window.APP_CONFIG && window.APP_CONFIG.API_URL) || "";
+
+  const chatEl = document.getElementById('chat');
+  const inputEl = document.getElementById('input');
+  const sendBtn = document.getElementById('send');
+
+  document.getElementById('suggest').addEventListener('click', (e)=>{
+    if (e.target.tagName === 'BUTTON') {
+      inputEl.value = e.target.textContent.trim();
+      inputEl.focus();
+    }
+  });
+
+  function addMsg(role, text){
+    const wrap = document.createElement('div');
+    wrap.className = 'msg ' + (role === 'user' ? 'user' : role === 'error' ? 'error' : 'bot');
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = text;
+    wrap.appendChild(bubble);
+    chatEl.appendChild(wrap);
+    chatEl.scrollTop = chatEl.scrollHeight;
+  }
+
+  async function ask(question){
+    if (!API_URL) {
+      addMsg('error','API URL이 설정되지 않았습니다. config.js 를 확인하세요.');
+      return;
+    }
+    addMsg('user', question);
+    sendBtn.disabled = true; inputEl.value = '';
+    const thinking = document.createElement('div');
+    thinking.className = 'msg bot';
+    const b = document.createElement('div');
+    b.className = 'bubble';
+    b.textContent = '분석 중… (S3 로그 적재는 수분 지연될 수 있음)';
+    thinking.appendChild(b); chatEl.appendChild(thinking); chatEl.scrollTop = chatEl.scrollHeight;
+
+    try{
+      const resp = await fetch(API_URL, {
+        method:'POST',
+        mode:'cors',
+        headers:{'content-type':'application/json'},
+        body: JSON.stringify({ question })
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ' + resp.statusText);
+      const data = await resp.json();
+      const parts = [];
+      if (data.answer) parts.push(data.answer);
+      if (data.alb_note || data.vpc_note) parts.push(`— 표본 메모 —\n${data.alb_note||''}\n${data.vpc_note||''}`.trim());
+      b.textContent = parts.join('\n\n') || JSON.stringify(data, null, 2);
+    }catch(err){
+      b.textContent = '요청 실패: ' + err.message + '\n(CORS 또는 API URL을 확인하세요)';
+      thinking.classList.add('error');
+    }finally{
+      sendBtn.disabled = false;
+    }
+  }
+
+  sendBtn.onclick = ()=>{ const q = inputEl.value.trim(); if (q) ask(q); };
+  inputEl.addEventListener('keydown', (e)=>{ if (e.key==='Enter' && !e.shiftKey){ e.preventDefault(); const q=inputEl.value.trim(); if(q) ask(q);} });
+</script>
+</body>
+</html>

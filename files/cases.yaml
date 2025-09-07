@@ -1,0 +1,43 @@
+meta:
+  version: 1
+  notes: "ALB/VPC Flow 공용 사례집 예시"
+
+alb:
+  rules:
+    - id: 5xx-spike
+      when: "5분 윈도우 5xx율 ≥ 5%"
+      interpret: "백엔드 오류/배포 이슈 가능"
+      actions:
+        - "에러 윈도우 시간대의 배포/설정 변경 이력 점검"
+        - "문제 타깃 그룹/인스턴스 헬스체크/로그 확인"
+        - "에러 비율이 높은 경로 우선 점검(/api/* 등)"
+
+    - id: many-4xx-path
+      when: "특정 경로 4xx 상위 집중"
+      interpret: "클라이언트 오류/변경된 API 스펙/봇 트래픽 가능"
+      actions:
+        - "해당 경로의 최근 스펙 변경/리다이렉트 확인"
+        - "상위 UA/IP 패턴으로 봇 여부 확인 및 WAF 규칙 보강"
+
+vpcflow:
+  rules:
+    - id: port-scan
+      when: "같은 src가 2분 내 20개 이상 dstport 시도"
+      interpret: "포트 스캔 의심"
+      actions:
+        - "해당 src 임시 차단 검토(NFW/SG 규칙)"
+        - "GeoIP/ASN 기반 차단/레이트 리밋 정책 검토"
+
+    - id: ssh-rdp-brute
+      when: "REJECT 상위 포트가 22/3389 위주"
+      interpret: "SSH/RDP 무차별 대입 의심"
+      actions:
+        - "SSM Session Manager 사용, 22/3389 외부 차단 권장"
+        - "접속 필요 시 소스 제한/일회성 접속(프록시) 사용"
+
+    - id: smb-scan
+      when: "REJECT 상위 포트 445/139 다수"
+      interpret: "SMB 취약점 스캔/랜섬웨어 사전 탐색 가능성"
+      actions:
+        - "내부 세그먼트 SMB 접근제어 재점검"
+        - "의심 src의 내부 감염 여부 점검(EDR/AV 스캔)"
