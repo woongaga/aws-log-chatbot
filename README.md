@@ -54,7 +54,7 @@ terraform destroy
 - 브라우저에서 S3 Website URL 접속 → 버튼(“오늘 비정상 로그 있어?” 등)으로 질의 테스트
 - 의도적 4xx/5xx 로그 생성 팁
   - 404: `http://<ALB-DNS>/no-such-page` 요청
-  - 500: RDS 보안 그룹에서 EC2→RDS 포트를 잠시 막고 `http://<ALB-DNS>/index.php` 열기
+  - 504: RDS 보안 그룹에서 EC2→RDS 포트를 잠시 막고 `http://<ALB-DNS>` 열기
 
 # 유의할 점
 - NAT/ALB/RDS가 포함되어 시간 단위 과금 발생
